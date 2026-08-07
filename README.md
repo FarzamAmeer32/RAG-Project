@@ -1,204 +1,312 @@
-# Pakistan Legal Documents RAG System
+# Day 1 — RAG Pipeline Exploration
 
 ## Overview
 
-This project is a Retrieval-Augmented Generation (RAG) system designed to answer questions from legal documents and PDFs obtained from the Pakistan Code website.
+This branch contains the Day 1 work for the Retrieval-Augmented Generation (RAG) project.
 
-The user provides legal documents in PDF format, and the system processes these documents so that users can ask questions and receive answers based on the information available in the documents.
+The goal of Day 1 was to understand and implement the basic RAG pipeline from document processing to answer generation.
 
-The main goal is to make it easier to search and understand large legal documents using natural language questions.
+A simple **Machine Learning Basics PDF** was used as a test document to explore the complete pipeline before working with the actual legal documents from Pakistan Code.
 
-## How the System Works
+---
 
-The system follows this pipeline:
+## What Was Implemented
+
+The following RAG pipeline was implemented:
 
 ```text
-Pakistan Code PDF
-        ↓
-   Text Extraction
-        ↓
-      Chunking
-        ↓
-    Embeddings
-        ↓
-   Vector Database
-        ↓
-    User Question
-        ↓
- Question Embedding
-        ↓
-  Similarity Search
-        ↓
- Relevant Legal Chunks
-        ↓
-        LLM
-        ↓
-    Final Answer
+PDF
+ ↓
+Text Extraction
+ ↓
+Chunking
+ ↓
+Embeddings
+ ↓
+FAISS Vector Search
+ ↓
+Relevant Chunks
+ ↓
+Qwen LLM
+ ↓
+Generated Answer
 ```
 
-## Main Components
+---
 
-### 1. Legal PDF Documents
+## 1. PDF Text Extraction
 
-The system uses legal documents in PDF format obtained from the Pakistan Code website.
+A sample Machine Learning Basics PDF was used.
 
-These documents may contain:
+The PDF text was extracted and prepared for further processing.
 
-* Acts
-* Ordinances
-* Rules
-* Regulations
-* Other legal documents
+The sample document contained topics such as:
 
-The PDFs are provided as the knowledge source for the RAG system.
+* Machine Learning
+* Supervised Learning
+* Unsupervised Learning
+* Reinforcement Learning
+* Classification
+* Regression
+* Clustering
 
-### 2. Text Extraction
+The PDF was used only as a test document for learning the RAG workflow.
 
-The text is extracted from the uploaded PDF documents.
+---
 
-The extracted text is then prepared for further processing.
+## 2. Text Chunking
 
-### 3. Chunking
+The extracted text was divided into smaller chunks.
 
-Large legal documents are divided into smaller chunks.
+A basic character-based chunking approach was used for the initial implementation.
 
-Chunking is important because sending an entire legal document to an LLM at once is inefficient and can make retrieving the correct information difficult.
+The purpose was to understand:
 
-The project will experiment with different chunking approaches to find an effective method for legal documents.
+* Why documents need to be chunked
+* How chunk size affects retrieval
+* How chunks are later converted into embeddings
 
-### 4. Embeddings
+---
 
-Each text chunk is converted into a numerical vector using an embedding model.
+## 3. Text Embeddings
 
-The initial implementation uses:
+The chunks were converted into numerical vectors using the Sentence Transformers library.
+
+Embedding model used:
 
 ```text
 all-MiniLM-L6-v2
 ```
 
-These vectors represent the semantic meaning of the legal text and allow similar questions and document sections to be matched.
+The model generates **384-dimensional embeddings**.
 
-### 5. Vector Search
-
-The embeddings are stored in a vector search system.
-
-The initial implementation uses:
+For example:
 
 ```text
-FAISS
+Number of chunks = 100
+Embedding dimension = 384
+
+Embedding matrix:
+(100, 384)
 ```
 
-ChromaDB will also be explored as a vector database during the project.
+This means each chunk is represented by a vector containing 384 numerical values.
 
-### 6. Retrieval
+---
 
-When the user asks a question, the question is converted into an embedding using the same embedding model.
+## 4. FAISS Vector Search
 
-The system searches the vector store and retrieves the most relevant sections of the legal documents.
+FAISS was used for storing and searching the chunk embeddings.
 
-### 7. Large Language Model
+The following index was used:
 
-The retrieved legal context is provided to an LLM along with the user's question.
+```python
+faiss.IndexFlatL2(dimension)
+```
 
-The project currently uses:
+`IndexFlatL2` performs an exact similarity search using **L2 (Euclidean) distance**.
+
+The embeddings were added to the FAISS index:
+
+```python
+index.add(chunk_embeddings)
+```
+
+When a user asks a question:
+
+1. The question is converted into an embedding.
+2. FAISS compares the question vector with the stored chunk vectors.
+3. The most similar chunks are retrieved.
+
+Example:
 
 ```text
+User Question
+      ↓
+Question Embedding
+      ↓
+FAISS Search
+      ↓
+Top K Relevant Chunks
+```
+
+---
+
+## 5. Retrieval Testing
+
+Several questions were tested against the sample document.
+
+Example:
+
+```text
+What is supervised learning?
+```
+
+The system successfully retrieved chunks containing information about supervised learning.
+
+Questions unrelated to the document were also tested to observe how the system behaves when the required information is not available in the knowledge base.
+
+---
+
+## 6. Qwen LLM Integration
+
+The retrieved chunks were passed to a Qwen language model to generate the final answer.
+
+Model used:
+
+```text
+Qwen/Qwen2.5-1.5B-Instruct
+```
+
+The LLM receives:
+
+```text
+Retrieved Context
++
+User Question
+```
+
+through a prompt such as:
+
+```text
+Answer the question using ONLY the provided context.
+
+Context:
+[Retrieved chunks]
+
+Question:
+[User question]
+
+Answer:
+```
+
+This allows the LLM to generate an answer based on the retrieved document information.
+
+---
+
+## 7. Tokenization and Generation
+
+The Qwen tokenizer converts the prompt into token IDs that can be processed by the model.
+
+The general flow is:
+
+```text
+Prompt
+ ↓
+Tokenizer
+ ↓
+Token IDs
+ ↓
 Qwen
+ ↓
+Generated Token IDs
+ ↓
+Tokenizer
+ ↓
+Text Answer
 ```
 
-The LLM generates the answer based on the retrieved context.
+Only the newly generated tokens are decoded so that the final output contains the answer rather than the original prompt.
 
-### 8. Source Information
+---
 
-The system is intended to provide information about the source of the retrieved content, such as:
+## Testing
+
+The RAG pipeline was tested with questions such as:
 
 ```text
-Document: [Legal Document Name]
-Page: [Page Number]
+What is machine learning?
+
+What is supervised learning?
+
+What is unsupervised learning?
+
+What is the difference between classification and regression?
+
+What is an example of clustering?
+
+What is a convolutional neural network?
 ```
 
-This helps users identify where the information used for the answer came from.
+The first questions can be answered using information from the sample PDF.
 
-## Example
+The last question is not covered by the sample document and was used to test the system's behavior when the required information is not present in the retrieved context.
 
-A user may upload a legal PDF and ask:
+---
 
-```text
-What is the punishment for this offence?
-```
-
-The system will:
-
-1. Convert the PDF into text.
-2. Split the text into chunks.
-3. Generate embeddings for the chunks.
-4. Store the embeddings in the vector store.
-5. Convert the user's question into an embedding.
-6. Retrieve the most relevant legal sections.
-7. Pass the retrieved sections and question to Qwen.
-8. Generate an answer based on the retrieved legal text.
-9. Provide the relevant source information.
-
-## Technologies
+## Technologies Used
 
 * Python
+* Google Colab
 * PyPDF
 * Sentence Transformers
 * FAISS
-* ChromaDB
 * Hugging Face Transformers
 * Qwen
 * PyTorch
-* Google Colab
-* Flask and React (Planned)
+* NumPy
 
-## Project Structure
+---
+
+## Files in This Branch
 
 ```text
-Pakistan-Code-RAG/
+Day-1/
 │
-├── documents/
-│   └── legal PDFs
-│
-├── notebooks/
-│   └── RAG experiments
-│
-├── src/
-│   ├── document_loader.py
-│   ├── chunking.py
-│   ├── embeddings.py
-│   ├── vector_store.py
-│   ├── retrieval.py
-│   └── generation.py
-│
-├── app.py
+├── RAG.ipynb
 ├── requirements.txt
 └── README.md
 ```
 
-## Project Progress
+### `RAG.ipynb`
 
-* [x] PDF text extraction
-* [x] Basic text chunking
-* [x] Generate embeddings
-* [x] FAISS vector search
-* [x] Retrieve relevant document chunks
-* [x] Qwen LLM integration
-* [ ] Improve chunking for legal documents
-* [ ] ChromaDB integration
-* [ ] Store document metadata
-* [ ] Add page/document references
-* [ ] Improve retrieval quality
-* [ ] Evaluate RAG responses
-* [ ] Build user interface
+Contains the complete Day 1 implementation, including:
 
+* PDF text extraction
+* Chunking
+* Embedding generation
+* FAISS index creation
+* Similarity search
+* Retrieval
+* Qwen model loading
+* Prompt creation
+* Answer generation
+* RAG testing
 
-## Important Note
+### `requirements.txt`
 
-This system is designed to retrieve and explain information from the provided legal documents.
+Contains the Python dependencies required to run the notebook.
 
-The generated responses should not be considered a substitute for professional legal advice. Users should refer to the original legal documents for authoritative information.
+```text
+pypdf
+sentence-transformers
+faiss-cpu
+transformers
+accelerate
+torch
+numpy
+```
 
-## Goal
+---
 
-The goal of this project is to build a practical RAG system for searching and answering questions about Pakistani legal documents while maintaining a clear connection between generated answers and their original sources.
+## Result
+
+By the end of Day 1, a basic end-to-end RAG pipeline was successfully implemented:
+
+```text
+Document
+   ↓
+Chunks
+   ↓
+Embeddings
+   ↓
+FAISS
+   ↓
+Retrieval
+   ↓
+Qwen
+   ↓
+Answer
+```
+
+This implementation serves as the foundation for the next stage, where the pipeline can be tested with actual legal documents from Pakistan Code and improved with better chunking, metadata, retrieval, and source tracking.
