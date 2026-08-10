@@ -1,312 +1,555 @@
-# Day 1 — RAG Pipeline Exploration
+# Day 2 — RAG Pipeline Implementation
 
 ## Overview
 
-This branch contains the Day 1 work for the Retrieval-Augmented Generation (RAG) project.
+On Day 2, the basic RAG concepts explored on Day 1 were applied to a real-world legal document:
 
-The goal of Day 1 was to understand and implement the basic RAG pipeline from document processing to answer generation.
+**The Abandoned Properties (Management) Act, 1975**
 
-A simple **Machine Learning Basics PDF** was used as a test document to explore the complete pipeline before working with the actual legal documents from Pakistan Code.
+The focus was on building the core Retrieval-Augmented Generation (RAG) pipeline, with particular attention to document preprocessing, section-aware chunking, metadata, embeddings, vector search, retrieval, and answer generation.
+
+The web interface was not the focus of this stage.
 
 ---
 
-## What Was Implemented
+## Document
 
-The following RAG pipeline was implemented:
+**Document:** The Abandoned Properties (Management) Act, 1975
+
+**Pages:** 12
+
+The document contains 30 sections covering topics such as:
+
+* Definitions
+* Vesting of abandoned property
+* Board of Trustees
+* Appointment of Administrators
+* Claims by interested persons
+* Appeals and revision
+* Penalties
+* Powers of the Federal Government
+
+---
+
+## Day 2 Objectives
+
+The main objectives were to:
+
+1. Load and extract text from the legal PDF.
+2. Clean the extracted text.
+3. Remove unnecessary contents-page information.
+4. Detect the 30 legal sections.
+5. Split large sections into smaller chunks.
+6. Attach metadata to each chunk.
+7. Generate embeddings for the chunks.
+8. Store embeddings in FAISS.
+9. Perform similarity-based retrieval.
+10. Pass retrieved context to an LLM.
+11. Generate answers grounded in the retrieved context.
+12. Use metadata to provide source citations.
+
+---
+
+## RAG Pipeline
 
 ```text
-PDF
- ↓
-Text Extraction
- ↓
-Chunking
- ↓
-Embeddings
- ↓
-FAISS Vector Search
- ↓
-Relevant Chunks
- ↓
-Qwen LLM
- ↓
-Generated Answer
+                Legal PDF
+                    │
+                    ▼
+             PDF Text Extraction
+                    │
+                    ▼
+               Text Cleaning
+                    │
+                    ▼
+          Remove Contents Pages
+                    │
+                    ▼
+             Detect Sections
+                    │
+                    ▼
+          Section-Aware Chunking
+                    │
+                    ▼
+               Add Metadata
+                    │
+                    ▼
+            Generate Embeddings
+                    │
+                    ▼
+                  FAISS
+                    │
+                    ▼
+             User Question
+                    │
+                    ▼
+           Question Embedding
+                    │
+                    ▼
+            Similarity Search
+                    │
+                    ▼
+            Relevant Chunks
+                    │
+              ┌─────┴─────┐
+              ▼           ▼
+           Context     Metadata
+              │           │
+              ▼           ▼
+             Qwen      Source Info
+              │           │
+              └─────┬─────┘
+                    ▼
+              Final Answer
+                    │
+                    ▼
+                Citation
 ```
 
 ---
 
-## 1. PDF Text Extraction
+## 1. PDF Loading
 
-A sample Machine Learning Basics PDF was used.
+The PDF was loaded using `pypdf`.
 
-The PDF text was extracted and prepared for further processing.
+Text was extracted **page-by-page** instead of treating the entire document as one string. This allowed page information to be preserved for later source citation.
 
-The sample document contained topics such as:
+Example structure:
 
-* Machine Learning
-* Supervised Learning
-* Unsupervised Learning
-* Reinforcement Learning
-* Classification
-* Regression
-* Clustering
-
-The PDF was used only as a test document for learning the RAG workflow.
+```python
+{
+    "page": 5,
+    "text": "..."
+}
+```
 
 ---
 
-## 2. Text Chunking
+## 2. Text Cleaning
 
-The extracted text was divided into smaller chunks.
+The extracted PDF text contained formatting artifacts caused by PDF extraction.
 
-A basic character-based chunking approach was used for the initial implementation.
+Basic preprocessing was performed to:
 
-The purpose was to understand:
+* Remove `Page X of Y` markers.
+* Remove excessive spaces.
+* Fix escaped section numbers.
+* Remove excessive blank lines.
+* Normalize the extracted text.
 
-* Why documents need to be chunked
-* How chunk size affects retrieval
-* How chunks are later converted into embeddings
+The cleaning was intentionally kept simple to avoid accidentally modifying the meaning of legal text.
 
 ---
 
-## 3. Text Embeddings
+## 3. Removing Contents Pages
 
-The chunks were converted into numerical vectors using the Sentence Transformers library.
+The first two pages contained the table of contents rather than the actual legal text.
 
-Embedding model used:
+Therefore, pages 1 and 2 were excluded from the RAG knowledge base.
+
+The actual Act begins from page 3.
+
+Page markers were retained internally in the document:
 
 ```text
+[PAGE 3]
+[PAGE 4]
+[PAGE 5]
+...
+```
+
+This helped identify the source page of each section.
+
+---
+
+## 4. Section Detection
+
+The legal document has **30 sections**.
+
+A regular expression was used to identify section headings such as:
+
+```text
+1. Short title, extent and commencement
+2. Definitions
+3. Vesting of abandoned property in Government
+...
+30. Power to make rules
+```
+
+Each detected section was stored separately.
+
+Example:
+
+```python
+{
+    "section": "6",
+    "title": "Holding of abandoned property and its surrender, etc.",
+    "text": "..."
+}
+```
+
+This section-aware approach was preferred over blindly splitting the entire document because legal documents have meaningful structural boundaries.
+
+---
+
+## 5. Chunking Strategy
+
+A combination of **section-aware chunking** and `RecursiveCharacterTextSplitter` was used.
+
+The approach was:
+
+```text
+Section
+   │
+   ├── ≤ 1000 characters → Keep as one chunk
+   │
+   └── > 1000 characters → Recursive splitting
+```
+
+Configuration:
+
+```python
+RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=150,
+    separators=["\n\n", "\n", ". ", " ", ""]
+)
+```
+
+### Why 1000 characters?
+
+The goal was to keep enough legal context inside each chunk while preventing chunks from becoming unnecessarily large.
+
+### Why 150-character overlap?
+
+Overlap helps preserve context when a sentence or important information falls near a chunk boundary.
+
+---
+
+## 6. Metadata
+
+Metadata was attached to every chunk.
+
+Example:
+
+```python
+{
+    "text": "...",
+
+    "metadata": {
+        "source": "Abandoned Properties (Management) Act, 1975",
+        "page": 5,
+        "section": "6",
+        "title": "Holding of abandoned property and its surrender, etc.",
+        "chunk_id": 5
+    }
+}
+```
+
+Metadata is not embedded into the vector.
+
+Instead:
+
+```text
+Chunk Text
+    │
+    ▼
+Embedding Model
+    │
+    ▼
+Vector
+```
+
+while the metadata remains associated with the original chunk.
+
+This allows the system to identify the source after retrieval.
+
+---
+
+## 7. Embedding Model
+
+### Model
+
+`all-MiniLM-L6-v2`
+
+The model was used through the `sentence-transformers` library.
+
+Each chunk is converted into a **384-dimensional vector**.
+
+Conceptually:
+
+```text
+Text Chunk
+    ↓
 all-MiniLM-L6-v2
+    ↓
+[0.021, -0.184, 0.073, ..., 0.112]
+    ↓
+384-dimensional vector
 ```
 
-The model generates **384-dimensional embeddings**.
-
-For example:
-
-```text
-Number of chunks = 100
-Embedding dimension = 384
-
-Embedding matrix:
-(100, 384)
-```
-
-This means each chunk is represented by a vector containing 384 numerical values.
+The same embedding model is used to embed the user's question during retrieval.
 
 ---
 
-## 4. FAISS Vector Search
+## 8. Vector Database
 
-FAISS was used for storing and searching the chunk embeddings.
+### FAISS
 
-The following index was used:
+FAISS was selected for vector similarity search.
+
+The index used was:
 
 ```python
 faiss.IndexFlatL2(dimension)
 ```
 
-`IndexFlatL2` performs an exact similarity search using **L2 (Euclidean) distance**.
+### Why FAISS?
 
-The embeddings were added to the FAISS index:
+* Simple to implement.
+* Fast similarity search.
+* Works well for a relatively small document collection.
+* Runs locally.
+* Does not require an external database service.
+* Suitable for learning and demonstrating the core RAG retrieval process.
 
-```python
-index.add(chunk_embeddings)
-```
+The embeddings are stored in FAISS while the original chunks and their metadata remain in Python data structures.
+
+---
+
+## 9. Retrieval
 
 When a user asks a question:
-
-1. The question is converted into an embedding.
-2. FAISS compares the question vector with the stored chunk vectors.
-3. The most similar chunks are retrieved.
-
-Example:
 
 ```text
 User Question
       ↓
-Question Embedding
+Embedding Model
       ↓
-FAISS Search
+Question Vector
       ↓
-Top K Relevant Chunks
+FAISS Similarity Search
+      ↓
+Top-k Relevant Chunks
 ```
+
+For example:
+
+```text
+Question:
+"What happens if a person refuses to surrender abandoned property?"
+```
+
+The question is converted into a vector and compared against the stored chunk vectors.
+
+The most relevant chunks are then retrieved.
 
 ---
 
-## 5. Retrieval Testing
+## 10. Context Construction
 
-Several questions were tested against the sample document.
+The text from the retrieved dictionaries was extracted and joined together:
 
-Example:
-
-```text
-What is supervised learning?
+```python
+context = "\n\n".join(
+    chunk["text"]
+    for chunk in retrieved_chunks
+)
 ```
 
-The system successfully retrieved chunks containing information about supervised learning.
+This context was then provided to the LLM.
 
-Questions unrelated to the document were also tested to observe how the system behaves when the required information is not available in the knowledge base.
+Metadata was kept separately so that it could later be used for source citation.
 
 ---
 
-## 6. Qwen LLM Integration
+## 11. LLM Generation
 
-The retrieved chunks were passed to a Qwen language model to generate the final answer.
-
-Model used:
-
-```text
-Qwen/Qwen2.5-1.5B-Instruct
-```
+Qwen was used to generate the final answer.
 
 The LLM receives:
 
 ```text
-Retrieved Context
-+
 User Question
++
+Retrieved Context
 ```
 
-through a prompt such as:
+The goal is to instruct the model to answer using only the retrieved legal context.
+
+The generation configuration included:
+
+```python
+with torch.no_grad():
+    outputs = model.generate(
+        **input,
+        max_new_tokens=512,
+        temperature=0.1
+    )
+```
+
+A low temperature was used to encourage more deterministic responses.
+
+---
+
+## 12. Source Citation
+
+The LLM is responsible for generating the answer, but it does **not** need to generate the source metadata itself.
+
+The retrieved chunks already contain:
 
 ```text
-Answer the question using ONLY the provided context.
+Source
+Page
+Section
+Title
+Chunk ID
+```
 
-Context:
-[Retrieved chunks]
+Therefore, the application can produce citations from the retrieved metadata.
 
-Question:
-[User question]
+Example:
 
+```text
 Answer:
+According to Section 7, the Administrator may use necessary
+force to take possession of abandoned property if the person
+does not surrender it.
+
+Source:
+Abandoned Properties (Management) Act, 1975
+Section 7, Page 5
 ```
 
-This allows the LLM to generate an answer based on the retrieved document information.
+This approach reduces the risk of the LLM inventing source information.
 
 ---
 
-## 7. Tokenization and Generation
+## Day 2 Results
 
-The Qwen tokenizer converts the prompt into token IDs that can be processed by the model.
+The following components were successfully implemented:
 
-The general flow is:
-
-```text
-Prompt
- ↓
-Tokenizer
- ↓
-Token IDs
- ↓
-Qwen
- ↓
-Generated Token IDs
- ↓
-Tokenizer
- ↓
-Text Answer
-```
-
-Only the newly generated tokens are decoded so that the final output contains the answer rather than the original prompt.
+* PDF ingestion
+* Page-wise text extraction
+* Text cleaning
+* Contents removal
+* Detection of 30 legal sections
+* Section-aware chunking
+* Recursive chunking for larger sections
+* 1000-character target chunk size
+* 150-character chunk overlap
+* Chunk metadata
+* `all-MiniLM-L6-v2` embeddings
+* 384-dimensional vectors
+* FAISS vector index
+* Similarity-based retrieval
+* Context construction
+* Qwen-based answer generation
+* Metadata-based source citation
 
 ---
 
-## Testing
+## Key Findings
 
-The RAG pipeline was tested with questions such as:
+### 1. Document structure matters
 
-```text
-What is machine learning?
+Legal documents have meaningful sections. Preserving those sections before chunking provides more useful context than blindly splitting the entire document.
 
-What is supervised learning?
+### 2. Smaller chunks are not always better
 
-What is unsupervised learning?
+Very small chunks can lose important legal context. A balance between chunk size and contextual completeness is necessary.
 
-What is the difference between classification and regression?
+### 3. Metadata is separate from embeddings
 
-What is an example of clustering?
+The embedding represents the semantic information of the chunk, while metadata provides information such as the source, page, and section.
 
-What is a convolutional neural network?
-```
+### 4. Retrieval quality affects answer quality
 
-The first questions can be answered using information from the sample PDF.
+The LLM can only generate a grounded answer if the relevant information is successfully retrieved.
 
-The last question is not covered by the sample document and was used to test the system's behavior when the required information is not present in the retrieved context.
+### 5. FAISS is sufficient for the current dataset
 
----
-
-## Technologies Used
-
-* Python
-* Google Colab
-* PyPDF
-* Sentence Transformers
-* FAISS
-* Hugging Face Transformers
-* Qwen
-* PyTorch
-* NumPy
+For a small legal-document collection, FAISS provides a simple and efficient way to perform vector similarity search without introducing unnecessary infrastructure.
 
 ---
 
-## Files in This Branch
+## Current Architecture
 
 ```text
-Day-1/
-│
-├── RAG.ipynb
-├── requirements.txt
-└── README.md
-```
-
-### `RAG.ipynb`
-
-Contains the complete Day 1 implementation, including:
-
-* PDF text extraction
-* Chunking
-* Embedding generation
-* FAISS index creation
-* Similarity search
-* Retrieval
-* Qwen model loading
-* Prompt creation
-* Answer generation
-* RAG testing
-
-### `requirements.txt`
-
-Contains the Python dependencies required to run the notebook.
-
-```text
-pypdf
-sentence-transformers
-faiss-cpu
-transformers
-accelerate
-torch
-numpy
+                    ┌──────────────┐
+                    │  Legal PDF   │
+                    └──────┬───────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ Text Extraction │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ Text Cleaning   │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ Section Parsing │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ Chunking        │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │    Metadata     │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ MiniLM Embedding│
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │      FAISS      │
+                  └────────┬────────┘
+                           │
+                           │
+                    User Question
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │Question Embedding│
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ FAISS Retrieval │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ Retrieved Context│
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │      Qwen       │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ Answer + Source │
+                  └─────────────────┘
 ```
 
 ---
 
-## Result
+## Day 2 Conclusion
 
-By the end of Day 1, a basic end-to-end RAG pipeline was successfully implemented:
+Day 2 focused on moving from theoretical RAG concepts to a working retrieval and generation pipeline using a real legal document.
 
-```text
-Document
-   ↓
-Chunks
-   ↓
-Embeddings
-   ↓
-FAISS
-   ↓
-Retrieval
-   ↓
-Qwen
-   ↓
-Answer
-```
+The system can now ingest the **Abandoned Properties (Management) Act, 1975**, preserve its legal section structure, create searchable embeddings, retrieve relevant sections using FAISS, provide the retrieved context to Qwen, and associate the generated answer with source metadata.
 
-This implementation serves as the foundation for the next stage, where the pipeline can be tested with actual legal documents from Pakistan Code and improved with better chunking, metadata, retrieval, and source tracking.
+The next stage will focus on **improving and evaluating the RAG system**, including retrieval quality, answer grounding, source citation, and potentially improving the user interaction layer.
