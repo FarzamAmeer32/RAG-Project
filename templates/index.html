@@ -1,0 +1,72 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Abandoned Properties RAG</title>
+
+    <!-- CSS -->
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>Abandoned Properties RAG</h1>
+
+        <p class="subtitle">
+            Ask questions about the Abandoned Properties (Management) Act, 1975
+        </p>
+
+        <div class="question-box">
+
+            <textarea
+                id="question"
+                placeholder="Ask a question..."
+                rows="4"
+            ></textarea>
+
+            <button id="askButton">
+                Ask Question
+            </button>
+
+        </div>
+
+        <div id="loading" class="hidden">
+            Processing...
+        </div>
+
+        <div id="error" class="error hidden"></div>
+
+        <section id="answerSection" class="hidden">
+
+            <h2>Answer</h2>
+
+            <div id="answer" class="answer"></div>
+
+        </section>
+
+        <section id="sourcesSection" class="hidden">
+
+            <h2>Sources</h2>
+
+            <div id="sources"></div>
+
+        </section>
+
+    </div>
+
+    <!-- JavaScript -->
+    <script
+        src="{{ url_for('static', filename='script.js') }}"
+    ></script>
+
+</body>
+</html>
+
