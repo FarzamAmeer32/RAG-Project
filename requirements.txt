@@ -1,8 +1,9 @@
-pypdf
+flask
+ollama
 sentence-transformers
-faiss-cpu
-transformers
-accelerate
-torch
+chromadb
+langchain
+langchain-text-splitters
+langchain-experimental
+pypdf
 numpy
-re
