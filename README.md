@@ -1,402 +1,402 @@
-# Day 2 — RAG Pipeline Implementation
+# Final Day — Modular RAG Application & Flask Integration
 
 ## Overview
 
-On Day 2, the basic RAG concepts explored on Day 1 were applied to a real-world legal document:
+On the final day, the RAG pipeline developed and tested in Google Colab was converted into a **modular application in VS Code**.
 
-**The Abandoned Properties (Management) Act, 1975**
+The main focus was on moving from a notebook-based RAG prototype to a structured application that can be executed as a complete pipeline through a Flask backend and a browser-based frontend.
 
-The focus was on building the core Retrieval-Augmented Generation (RAG) pipeline, with particular attention to document preprocessing, section-aware chunking, metadata, embeddings, vector search, retrieval, and answer generation.
+The existing RAG components were separated into reusable modules for document processing, chunking, embeddings, vector search, retrieval, and answer generation.
 
-The web interface was not the focus of this stage.
-
----
-
-## Document
-
-**Document:** The Abandoned Properties (Management) Act, 1975
-
-**Pages:** 12
-
-The document contains 30 sections covering topics such as:
-
-* Definitions
-* Vesting of abandoned property
-* Board of Trustees
-* Appointment of Administrators
-* Claims by interested persons
-* Appeals and revision
-* Penalties
-* Powers of the Federal Government
+The original Qwen model implementation using Hugging Face Transformers was also replaced with **Qwen running through Ollama** because loading and running the model directly through Transformers resulted in high latency on the available CPU-based environment.
 
 ---
 
-## Day 2 Objectives
+# Final Day Objectives
 
 The main objectives were to:
 
-1. Load and extract text from the legal PDF.
-2. Clean the extracted text.
-3. Remove unnecessary contents-page information.
-4. Detect the 30 legal sections.
-5. Split large sections into smaller chunks.
-6. Attach metadata to each chunk.
-7. Generate embeddings for the chunks.
-8. Store embeddings in FAISS.
-9. Perform similarity-based retrieval.
-10. Pass retrieved context to an LLM.
-11. Generate answers grounded in the retrieved context.
-12. Use metadata to provide source citations.
+1. Convert the Colab RAG pipeline into a modular VS Code project.
+2. Separate RAG functionality into reusable Python modules.
+3. Create helper functions for document processing and retrieval.
+4. Integrate the existing FAISS-based retrieval pipeline.
+5. Replace direct Transformers-based Qwen inference with Ollama.
+6. Reduce model-loading overhead during multiple questions.
+7. Create a Flask backend for the RAG application.
+8. Create a browser-based frontend using HTML, CSS, and JavaScript.
+9. Connect the frontend question form with the Flask API.
+10. Return generated answers and source information to the frontend.
+11. Test the complete RAG workflow through the web application.
 
 ---
 
-## RAG Pipeline
+# From Colab Prototype to Application
+
+The initial RAG pipeline was developed and tested in Google Colab.
+
+The pipeline was then converted into a modular VS Code implementation.
+
+### Colab Prototype
 
 ```text
-                Legal PDF
-                    │
-                    ▼
-             PDF Text Extraction
-                    │
-                    ▼
-               Text Cleaning
-                    │
-                    ▼
-          Remove Contents Pages
-                    │
-                    ▼
-             Detect Sections
-                    │
-                    ▼
-          Section-Aware Chunking
-                    │
-                    ▼
-               Add Metadata
-                    │
-                    ▼
-            Generate Embeddings
-                    │
-                    ▼
-                  FAISS
-                    │
-                    ▼
-             User Question
-                    │
-                    ▼
-           Question Embedding
-                    │
-                    ▼
-            Similarity Search
-                    │
-                    ▼
-            Relevant Chunks
-                    │
-              ┌─────┴─────┐
-              ▼           ▼
-           Context     Metadata
-              │           │
-              ▼           ▼
-             Qwen      Source Info
-              │           │
-              └─────┬─────┘
-                    ▼
-              Final Answer
-                    │
-                    ▼
-                Citation
+PDF
+ │
+ ▼
+Preprocessing
+ │
+ ▼
+Chunking
+ │
+ ▼
+Embeddings
+ │
+ ▼
+FAISS
+ │
+ ▼
+Retrieval
+ │
+ ▼
+Qwen
+ │
+ ▼
+Answer
+```
+
+### Modular VS Code Application
+
+```text
+                    ┌──────────────────┐
+                    │   Web Frontend   │
+                    │ HTML/CSS/JavaScript│
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │   Flask Backend  │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │   RAG Pipeline   │
+                    └────────┬─────────┘
+                             │
+             ┌───────────────┼────────────────┐
+             ▼               ▼                ▼
+       Document          Retrieval         Generation
+       Processing           │                │
+             │              ▼                ▼
+             │            FAISS           Ollama
+             │                               │
+             │                               ▼
+             │                          Qwen 2.5 3B
+             │
+             └───────────────┬────────────────┘
+                             ▼
+                          Answer
+                             │
+                             ▼
+                       Flask Response
+                             │
+                             ▼
+                         Frontend
 ```
 
 ---
 
-## 1. PDF Loading
+# 1. Modular Project Structure
 
-The PDF was loaded using `pypdf`.
+Instead of keeping the complete RAG workflow inside a single notebook or Python file, the functionality was separated into modular components.
 
-Text was extracted **page-by-page** instead of treating the entire document as one string. This allowed page information to be preserved for later source citation.
+A simplified structure is:
 
-Example structure:
+```text
+RAG Project/
+│
+├── app.py
+│
+├── config/
+│   └── config.py
+│
+├── helpers/
+│   ├── document_loader.py
+│   ├── text_cleaner.py
+│   ├── section_parser.py
+│   ├── chunker.py
+│   ├── embeddings.py
+│   ├── vector_store.py
+│   ├── retriever.py
+│   └── generator.py
+│
+├── data/
+│   └── legal_document.pdf
+│
+├── templates/
+│   └── index.html
+│
+├── static/
+│   ├── style.css
+│   └── script.js
+│
+└── requirements.txt
+```
+
+The exact modules may vary, but the main objective was to separate individual responsibilities rather than maintaining one large script.
+
+---
+
+# 2. Reusing the RAG Pipeline
+
+The logic developed during the earlier stages was reused in the modular application.
+
+The pipeline continues to perform:
+
+```text
+PDF Loading
+     ↓
+Text Cleaning
+     ↓
+Section Detection
+     ↓
+Section-Aware Chunking
+     ↓
+Metadata
+     ↓
+Embeddings
+     ↓
+FAISS
+     ↓
+Retrieval
+     ↓
+Context Construction
+     ↓
+LLM Generation
+```
+
+This allowed the work completed in Colab to become the foundation of the final application instead of rebuilding the RAG system from scratch.
+
+---
+
+# 3. Qwen Model Migration
+
+## Previous Approach
+
+Initially, Qwen was loaded directly using Hugging Face Transformers:
 
 ```python
-{
-    "page": 5,
-    "text": "..."
-}
+from transformers import AutoTokenizer, AutoModelForCausalLM
 ```
 
----
+The model was loaded and used directly for text generation.
 
-## 2. Text Cleaning
+However, loading the model through Transformers on the available CPU environment introduced significant latency.
 
-The extracted PDF text contained formatting artifacts caused by PDF extraction.
-
-Basic preprocessing was performed to:
-
-* Remove `Page X of Y` markers.
-* Remove excessive spaces.
-* Fix escaped section numbers.
-* Remove excessive blank lines.
-* Normalize the extracted text.
-
-The cleaning was intentionally kept simple to avoid accidentally modifying the meaning of legal text.
-
----
-
-## 3. Removing Contents Pages
-
-The first two pages contained the table of contents rather than the actual legal text.
-
-Therefore, pages 1 and 2 were excluded from the RAG knowledge base.
-
-The actual Act begins from page 3.
-
-Page markers were retained internally in the document:
+A major issue was that model loading could occur whenever an answer was requested, resulting in an inefficient workflow:
 
 ```text
-[PAGE 3]
-[PAGE 4]
-[PAGE 5]
-...
+Question 1
+   ↓
+Load Qwen
+   ↓
+Generate Answer
+
+Question 2
+   ↓
+Load Qwen again
+   ↓
+Generate Answer
 ```
 
-This helped identify the source page of each section.
+This made interactive usage slow.
 
 ---
 
-## 4. Section Detection
+# 4. Ollama Integration
 
-The legal document has **30 sections**.
+To improve the local inference workflow, Qwen was moved to **Ollama**.
 
-A regular expression was used to identify section headings such as:
+The Qwen model was downloaded and managed by Ollama rather than being loaded directly through Transformers.
 
-```text
-1. Short title, extent and commencement
-2. Definitions
-3. Vesting of abandoned property in Government
-...
-30. Power to make rules
-```
-
-Each detected section was stored separately.
+The Python application communicates with the local Ollama server using the Python `ollama` client.
 
 Example:
 
 ```python
-{
-    "section": "6",
-    "title": "Holding of abandoned property and its surrender, etc.",
-    "text": "..."
-}
-```
+import ollama
 
-This section-aware approach was preferred over blindly splitting the entire document because legal documents have meaningful structural boundaries.
-
----
-
-## 5. Chunking Strategy
-
-A combination of **section-aware chunking** and `RecursiveCharacterTextSplitter` was used.
-
-The approach was:
-
-```text
-Section
-   │
-   ├── ≤ 1000 characters → Keep as one chunk
-   │
-   └── > 1000 characters → Recursive splitting
-```
-
-Configuration:
-
-```python
-RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=150,
-    separators=["\n\n", "\n", ". ", " ", ""]
+response = ollama.chat(
+    model="qwen2.5:3b",
+    messages=[
+        {
+            "role": "user",
+            "content": prompt
+        }
+    ],
+    options={
+        "temperature": 0.2,
+        "num_predict": 200
+    }
 )
 ```
 
-### Why 1000 characters?
-
-The goal was to keep enough legal context inside each chunk while preventing chunks from becoming unnecessarily large.
-
-### Why 150-character overlap?
-
-Overlap helps preserve context when a sentence or important information falls near a chunk boundary.
-
----
-
-## 6. Metadata
-
-Metadata was attached to every chunk.
-
-Example:
+The generated response is then extracted from:
 
 ```python
-{
-    "text": "...",
-
-    "metadata": {
-        "source": "Abandoned Properties (Management) Act, 1975",
-        "page": 5,
-        "section": "6",
-        "title": "Holding of abandoned property and its surrender, etc.",
-        "chunk_id": 5
-    }
-}
+response["message"]["content"]
 ```
-
-Metadata is not embedded into the vector.
-
-Instead:
-
-```text
-Chunk Text
-    │
-    ▼
-Embedding Model
-    │
-    ▼
-Vector
-```
-
-while the metadata remains associated with the original chunk.
-
-This allows the system to identify the source after retrieval.
 
 ---
 
-## 7. Embedding Model
+# 5. Why Ollama Was Used
 
-### Model
+Ollama was selected primarily because of the latency experienced with direct Transformers-based inference on CPU.
 
-`all-MiniLM-L6-v2`
+The new architecture separates model serving from the Flask application's Python process:
 
-The model was used through the `sentence-transformers` library.
+```text
+Flask Application
+       │
+       │ ollama.chat()
+       ▼
+Ollama Server
+       │
+       ▼
+Qwen 2.5 3B
+```
 
-Each chunk is converted into a **384-dimensional vector**.
+This means the Flask application no longer needs to manually initialize the Qwen tokenizer and model.
+
+It also avoids repeatedly loading the model through `AutoModelForCausalLM` for each user request.
+
+---
+
+# 6. Generation Pipeline
+
+The final generation process is:
+
+```text
+User Question
+      │
+      ▼
+Question Embedding
+      │
+      ▼
+FAISS Similarity Search
+      │
+      ▼
+Relevant Chunks
+      │
+      ▼
+Context Construction
+      │
+      ▼
+Legal Prompt
+      │
+      ▼
+Ollama
+      │
+      ▼
+Qwen 2.5 3B
+      │
+      ▼
+Generated Answer
+```
+
+The prompt instructs Qwen to:
+
+* Use only the retrieved context.
+* Avoid making up information.
+* State when the requested information is not available.
+* Answer as a legal document assistant.
+
+---
+
+# 7. Flask Backend
+
+A Flask backend was created to expose the RAG pipeline through an HTTP API.
+
+The backend is responsible for:
+
+1. Receiving the user's question.
+2. Passing the question to the RAG pipeline.
+3. Performing retrieval.
+4. Constructing the context.
+5. Calling Qwen through Ollama.
+6. Returning the generated answer.
+7. Returning relevant source metadata.
+
+The basic application flow is:
+
+```text
+Browser
+   │
+   │ POST /ask
+   ▼
+Flask
+   │
+   ▼
+RAG Pipeline
+   │
+   ├── Embedding
+   ├── FAISS Retrieval
+   ├── Context Construction
+   └── Ollama / Qwen
+   │
+   ▼
+JSON Response
+   │
+   ▼
+Browser
+```
+
+---
+
+# 8. Frontend
+
+A simple browser interface was created using:
+
+* HTML
+* CSS
+* JavaScript
+
+The frontend provides a question input and an **Ask Question** button.
+
+The JavaScript sends the question to the Flask backend and receives the generated response.
 
 Conceptually:
 
 ```text
-Text Chunk
-    ↓
-all-MiniLM-L6-v2
-    ↓
-[0.021, -0.184, 0.073, ..., 0.112]
-    ↓
-384-dimensional vector
+User enters question
+        │
+        ▼
+Ask Question
+        │
+        ▼
+JavaScript fetch()
+        │
+        ▼
+Flask /ask endpoint
+        │
+        ▼
+RAG + Qwen
+        │
+        ▼
+JSON response
+        │
+        ▼
+JavaScript
+        │
+        ▼
+Display answer
 ```
-
-The same embedding model is used to embed the user's question during retrieval.
 
 ---
 
-## 8. Vector Database
+# 9. Source Information
 
-### FAISS
+The existing metadata-based citation approach was retained.
 
-FAISS was selected for vector similarity search.
-
-The index used was:
-
-```python
-faiss.IndexFlatL2(dimension)
-```
-
-### Why FAISS?
-
-* Simple to implement.
-* Fast similarity search.
-* Works well for a relatively small document collection.
-* Runs locally.
-* Does not require an external database service.
-* Suitable for learning and demonstrating the core RAG retrieval process.
-
-The embeddings are stored in FAISS while the original chunks and their metadata remain in Python data structures.
-
----
-
-## 9. Retrieval
-
-When a user asks a question:
-
-```text
-User Question
-      ↓
-Embedding Model
-      ↓
-Question Vector
-      ↓
-FAISS Similarity Search
-      ↓
-Top-k Relevant Chunks
-```
-
-For example:
-
-```text
-Question:
-"What happens if a person refuses to surrender abandoned property?"
-```
-
-The question is converted into a vector and compared against the stored chunk vectors.
-
-The most relevant chunks are then retrieved.
-
----
-
-## 10. Context Construction
-
-The text from the retrieved dictionaries was extracted and joined together:
-
-```python
-context = "\n\n".join(
-    chunk["text"]
-    for chunk in retrieved_chunks
-)
-```
-
-This context was then provided to the LLM.
-
-Metadata was kept separately so that it could later be used for source citation.
-
----
-
-## 11. LLM Generation
-
-Qwen was used to generate the final answer.
-
-The LLM receives:
-
-```text
-User Question
-+
-Retrieved Context
-```
-
-The goal is to instruct the model to answer using only the retrieved legal context.
-
-The generation configuration included:
-
-```python
-with torch.no_grad():
-    outputs = model.generate(
-        **input,
-        max_new_tokens=512,
-        temperature=0.1
-    )
-```
-
-A low temperature was used to encourage more deterministic responses.
-
----
-
-## 12. Source Citation
-
-The LLM is responsible for generating the answer, but it does **not** need to generate the source metadata itself.
-
-The retrieved chunks already contain:
+Retrieved chunks contain information such as:
 
 ```text
 Source
@@ -406,150 +406,283 @@ Title
 Chunk ID
 ```
 
-Therefore, the application can produce citations from the retrieved metadata.
+The LLM generates the answer from the retrieved context, while the application can use the retrieved metadata to display the source.
 
 Example:
 
 ```text
 Answer:
-According to Section 7, the Administrator may use necessary
-force to take possession of abandoned property if the person
-does not surrender it.
+The Administrator may take necessary measures to
+secure and manage abandoned property.
 
 Source:
 Abandoned Properties (Management) Act, 1975
-Section 7, Page 5
+Section 16
+Page 7
 ```
 
-This approach reduces the risk of the LLM inventing source information.
+Keeping source information separate from the generated answer reduces the possibility of the LLM inventing page or section information.
 
 ---
 
-## Day 2 Results
+# 10. Final RAG Architecture
 
-The following components were successfully implemented:
-
-* PDF ingestion
-* Page-wise text extraction
-* Text cleaning
-* Contents removal
-* Detection of 30 legal sections
-* Section-aware chunking
-* Recursive chunking for larger sections
-* 1000-character target chunk size
-* 150-character chunk overlap
-* Chunk metadata
-* `all-MiniLM-L6-v2` embeddings
-* 384-dimensional vectors
-* FAISS vector index
-* Similarity-based retrieval
-* Context construction
-* Qwen-based answer generation
-* Metadata-based source citation
-
----
-
-## Key Findings
-
-### 1. Document structure matters
-
-Legal documents have meaningful sections. Preserving those sections before chunking provides more useful context than blindly splitting the entire document.
-
-### 2. Smaller chunks are not always better
-
-Very small chunks can lose important legal context. A balance between chunk size and contextual completeness is necessary.
-
-### 3. Metadata is separate from embeddings
-
-The embedding represents the semantic information of the chunk, while metadata provides information such as the source, page, and section.
-
-### 4. Retrieval quality affects answer quality
-
-The LLM can only generate a grounded answer if the relevant information is successfully retrieved.
-
-### 5. FAISS is sufficient for the current dataset
-
-For a small legal-document collection, FAISS provides a simple and efficient way to perform vector similarity search without introducing unnecessary infrastructure.
-
----
-
-## Current Architecture
+The final system can be represented as:
 
 ```text
-                    ┌──────────────┐
-                    │  Legal PDF   │
-                    └──────┬───────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Text Extraction │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Text Cleaning   │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Section Parsing │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Chunking        │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │    Metadata     │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ MiniLM Embedding│
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │      FAISS      │
-                  └────────┬────────┘
-                           │
-                           │
-                    User Question
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │Question Embedding│
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ FAISS Retrieval │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Retrieved Context│
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │      Qwen       │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Answer + Source │
-                  └─────────────────┘
+                         ┌─────────────────────┐
+                         │   Abandoned         │
+                         │   Properties Act    │
+                         │       PDF           │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │ Document Processing │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │ Section Detection   │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │      Chunking       │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │    Embeddings       │
+                         │ all-MiniLM-L6-v2    │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │       FAISS         │
+                         └──────────┬──────────┘
+                                    │
+                                    │
+                         ┌──────────▼──────────┐
+                         │    User Question    │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │ Question Embedding  │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │ Similarity Search   │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │  Relevant Chunks    │
+                         │    + Metadata       │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │ Context + Question  │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │      Ollama         │
+                         │    Qwen 2.5 3B      │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │ Answer + Sources    │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │    Flask Backend    │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │ HTML/CSS/JavaScript │
+                         │      Frontend       │
+                         └─────────────────────┘
 ```
 
 ---
 
-## Day 2 Conclusion
+# Final Day Results
 
-Day 2 focused on moving from theoretical RAG concepts to a working retrieval and generation pipeline using a real legal document.
+The following components were implemented:
 
-The system can now ingest the **Abandoned Properties (Management) Act, 1975**, preserve its legal section structure, create searchable embeddings, retrieve relevant sections using FAISS, provide the retrieved context to Qwen, and associate the generated answer with source metadata.
+* Modular RAG pipeline in VS Code
+* Reusable helper modules
+* Legal document preprocessing
+* Section-aware chunking
+* Metadata preservation
+* `all-MiniLM-L6-v2` embeddings
+* FAISS vector search
+* Similarity-based retrieval
+* Context construction
+* Qwen 2.5 3B integration
+* Ollama-based local model serving
+* Replacement of direct Transformers inference
+* Flask backend
+* HTML frontend
+* CSS styling
+* JavaScript frontend-backend communication
+* Source metadata handling
+* End-to-end RAG application structure
 
-The next stage will focus on **improving and evaluating the RAG system**, including retrieval quality, answer grounding, source citation, and potentially improving the user interaction layer.
+---
+
+# Issues Encountered
+
+During the final integration, several issues were identified and addressed during development.
+
+### 1. High Qwen inference latency
+
+The initial Transformers implementation was slow on CPU and introduced significant delay during generation.
+
+**Solution:**
+
+Qwen was moved to Ollama to provide a separate local model-serving layer and avoid repeatedly loading the model directly inside the Python application.
+
+### 2. Model loading on every question
+
+The initial implementation called the model-loading function from the answer-generation function.
+
+This meant that each question could trigger model initialization again.
+
+The generation code was redesigned so that Flask communicates with the already-running Ollama service instead of directly loading the Transformers model.
+
+### 3. Frontend not displaying responses
+
+During frontend integration, clicking the **Ask Question** button did not immediately display a response in the browser.
+
+This required debugging the communication between:
+
+```text
+JavaScript
+    ↓
+Flask API
+    ↓
+RAG Pipeline
+    ↓
+Ollama
+    ↓
+Qwen
+```
+
+The frontend and backend were therefore treated as separate components during debugging to identify where the request/response flow was stopping.
+
+### 4. CPU-based inference limitations
+
+Since inference was performed locally on CPU, response generation can still take noticeable time depending on the retrieved context and model workload.
+
+This highlighted the importance of efficient model serving and frontend feedback during generation.
+
+---
+
+# Key Findings
+
+### 1. Modularization improves maintainability
+
+Separating the RAG pipeline into individual modules makes the system easier to understand, test, debug, and extend.
+
+### 2. Notebook code can be converted into reusable application components
+
+The Colab prototype provided the foundation for the final application. The same RAG concepts were reorganized into reusable helper functions and backend components.
+
+### 3. Model serving affects application performance
+
+The choice of how an LLM is loaded and served can significantly affect response latency, especially on CPU-based systems.
+
+### 4. Ollama simplifies local LLM integration
+
+Using Ollama allowed the application to communicate with Qwen through a local API instead of manually handling tokenizer and model initialization inside the Flask application.
+
+### 5. Backend and frontend integration introduces additional failure points
+
+A RAG pipeline can work correctly in isolation while the web application still fails to display the result. Therefore, the complete system needs to be tested across the entire request-response chain.
+
+### 6. Retrieval remains critical
+
+Changing the LLM does not solve poor retrieval. The quality of the final answer still depends heavily on whether the correct legal sections are retrieved from FAISS.
+
+---
+
+# Final Project Architecture
+
+The final application consists of three major layers:
+
+```text
+┌─────────────────────────────────────────┐
+│              Frontend                   │
+│        HTML + CSS + JavaScript          │
+└────────────────────┬────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────┐
+│              Backend                    │
+│                 Flask                   │
+└────────────────────┬────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────┐
+│              RAG Layer                  │
+│                                         │
+│  Chunking → Embeddings → FAISS          │
+│  → Retrieval → Context Construction     │
+└────────────────────┬────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────┐
+│           Local LLM Layer               │
+│                                         │
+│             Ollama                     │
+│          Qwen 2.5 3B                   │
+└─────────────────────────────────────────┘
+```
+
+---
+
+# Final Conclusion
+
+The final day focused on converting the RAG pipeline developed during the earlier stages into a more structured and usable application.
+
+The **Abandoned Properties (Management) Act, 1975** is processed into section-aware chunks, embedded using `all-MiniLM-L6-v2`, indexed using FAISS, and retrieved based on semantic similarity.
+
+The retrieved legal context is passed to **Qwen 2.5 3B through Ollama**, replacing the slower direct Transformers implementation.
+
+The RAG pipeline was then integrated with a **Flask backend** and a **HTML/CSS/JavaScript frontend**, creating the foundation of a complete local legal-document question-answering application.
+
+The project demonstrated the complete flow from:
+
+```text
+Legal Document
+      ↓
+Preprocessing
+      ↓
+Chunking
+      ↓
+Embeddings
+      ↓
+Vector Database
+      ↓
+Retrieval
+      ↓
+Context
+      ↓
+Local LLM
+      ↓
+Flask API
+      ↓
+Web Interface
+      ↓
+Grounded Answer + Source
+```
+
+This completed the transition from a RAG experimentation notebook to a modular application architecture suitable for further improvement and evaluation.
