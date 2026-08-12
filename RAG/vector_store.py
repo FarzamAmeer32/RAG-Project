@@ -22,6 +22,8 @@ def create_vector_store(chunks):
     collection = client.get_or_create_collection(
         name="abandoned_properties"
     )
+    if collection.count()>0:
+        return collection
 
     # Prepare documents
     documents = [
