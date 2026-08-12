@@ -85,6 +85,8 @@ def rag_pipeline(question, collection):
     sources = []
 
     for score, document, metadata in reranked_results:
+        if score<0:
+            continue
 
         sources.append({
             "section": metadata["section"],
@@ -93,6 +95,17 @@ def rag_pipeline(question, collection):
             "source": metadata["source"],
             "score": float(score)
         })
+
+    if not sources:
+        return {
+        "answer": answer,
+        "sources": [
+            {
+                "message": "No Strong Source Available"
+            }
+        ]
+    }
+
 
     return {
         "answer": answer,
